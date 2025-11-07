@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17.5
+    container_name: pg17
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets:
+      - pg_password
+    # Wrapper script runs standard entrypoint, waits ready, restores custom dump once (marker), then keeps postgres in foreground
+    command: ["/scripts/psql_restore_db_with_roles_compose.sh", "wnga_auth", "wnga_auth_full_10012025.bkp", "wnga"]
+    volumes:
+      - pg17_data:/var/lib/postgresql/data
+      # custom HBA lives outside data dir; we point postgres to it via hba_file
+      - ./pg_hba.conf:/etc/postgresql/pg_hba_custom.conf:ro
+      # custom-format dump kept in initdb but renamed (.bkp) so official entrypoint ignores it
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      # init wrapper
+      - ./scripts/psql_restore_db_with_roles_compose.sh:/scripts/psql_restore_db_with_roles_compose.sh:ro
+      - ./backups:/backups:ro
+    restart: unless-stopped
+    healthcheck:
+      # run as postgres OS user so 'peer' auth passes
+      test: ["CMD-SHELL", "gosu postgres pg_isready -d wnga_auth || gosu postgres pg_isready -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pg17_data:
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
