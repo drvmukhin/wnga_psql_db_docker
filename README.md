@@ -58,3 +58,18 @@ ALTER DEFAULT PRIVILEGES FOR ROLE wnga IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE wnga IN SCHEMA public
   GRANT ALL ON FUNCTIONS TO wnga;
 ```
+
+## Start the test instance
+```
+docker-compose up -d db-pg-test
+```
+
+**Test restoration by placing backup files in ./backups directory**
+The container will automatically restore from the backup on first start
+
+# Connect to test database
+docker exec -it pg17-test psql -U postgres -d wnga_auth
+
+# Clean up test data when done
+docker-compose down db-pg-test
+docker volume rm pg17.5_pg17_test_data

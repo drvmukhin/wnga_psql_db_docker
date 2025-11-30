@@ -43,7 +43,32 @@ services:
       - pg17_ts_data:/var/lib/postgresql/data
       - ./pg_hba.conf:/etc/postgresql/pg_hba_custom.conf:ro
       - ./initdb:/docker-entrypoint-initdb.d:ro
-      - ./scripts/psql_restore_db_with_roles_compose.sh:/scripts/psql_restore_db.sh:ro
+      # Use the new TimescaleDB-optimized restore script
+      - ./scripts/psql_restore_ts_db_with_roles_compose.sh:/scripts/psql_restore_db.sh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "gosu postgres pg_isready -d wnga_auth || gosu postgres pg_isready -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  db-pg-test:
+    image: timescale/timescaledb:latest-pg17
+    container_name: pg17-test
+    ports:
+      - "5454:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets:
+      - pg_password
+    # Force restore on every startup by passing "force" as 4th parameter
+    command: ["/scripts/psql_restore_db.sh", "wnga_auth", "bkp_2025_11_29_14/wnga_auth.bkp", "wnga"]
+    volumes:
+      - pg17_test_data:/var/lib/postgresql/data
+      - ./pg_hba.conf:/etc/postgresql/pg_hba_custom.conf:ro
+      - ./backups:/docker-entrypoint-initdb.d:ro
+      - ./scripts/psql_restore_ts_db_with_roles_compose.sh:/scripts/psql_restore_db.sh:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "gosu postgres pg_isready -d wnga_auth || gosu postgres pg_isready -d postgres"]
@@ -54,6 +79,7 @@ services:
 volumes:
   pg17_data:
   pg17_ts_data:
+  pg17_test_data:
 
 
 secrets:
