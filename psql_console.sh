@@ -1,1 +1,1 @@
-docker exec -it pg17 gosu postgres psql
+docker exec -it pg17-ts gosu postgres psql

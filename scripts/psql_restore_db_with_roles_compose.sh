@@ -133,6 +133,7 @@ if [[ ${#ROLE_LIST[@]} -gt 0 ]]; then
     psql_c postgres "GRANT CONNECT ON DATABASE ${TARGET_DB} TO ${ROLE};"
 
     # Comprehensive schema permissions will be granted AFTER restore
+  done
 fi
 
 # Restore ONCE (idempotent) unless forced
