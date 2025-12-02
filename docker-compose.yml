@@ -63,12 +63,12 @@ services:
     secrets:
       - pg_password
     # Force restore on every startup by passing "force" as 4th parameter
-    command: ["/scripts/psql_restore_db.sh", "wnga_auth", "bkp_2025_11_29_14/wnga_auth.bkp", "wnga"]
+    command: ["/scripts/psql_restore_db.sh", "wnga_auth", "bkp_2025_11_30_9", "wnga"]
     volumes:
       - pg17_test_data:/var/lib/postgresql/data
       - ./pg_hba.conf:/etc/postgresql/pg_hba_custom.conf:ro
       - ./backups:/docker-entrypoint-initdb.d:ro
-      - ./scripts/psql_restore_ts_db_with_roles_compose.sh:/scripts/psql_restore_db.sh:ro
+      - ./scripts/psql_restore_ts_db_with_roles_compose_v2.sh:/scripts/psql_restore_db.sh:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "gosu postgres pg_isready -d wnga_auth || gosu postgres pg_isready -d postgres"]

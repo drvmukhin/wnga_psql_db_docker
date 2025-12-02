@@ -433,6 +433,68 @@ if [[ "$SKIP_RESTORE" == "false" ]]; then
     
     # TimescaleDB-specific post-restore tasks
     if [[ "$HAS_TIMESCALEDB" == "t" ]]; then
+      # First check if hypertables were auto-created from the backup
+      INITIAL_HT_COUNT=$(gosu postgres psql -d "$TARGET_DB" -At -c \
+        "SELECT COUNT(*) FROM timescaledb_information.hypertables;" 2>/dev/null || echo "0")
+      
+      if [[ "$INITIAL_HT_COUNT" -eq 0 ]]; then
+        echo ""
+        echo "🔧 No hypertables found after restore - checking for tables to convert..."
+        
+        # Check if we have metadata file
+        if [[ -f "$TS_INFO_PATH" && -s "$TS_INFO_PATH" ]]; then
+          echo "📊 Using TimescaleDB metadata from backup file..."
+          while IFS='|' read -r hypertable partition_column chunk_interval; do
+            if [[ -n "$hypertable" && -n "$partition_column" ]]; then
+              echo "  Converting $hypertable to hypertable (column: $partition_column, interval: $chunk_interval)"
+              
+              # Extract schema and table name
+              SCHEMA=$(echo "$hypertable" | cut -d'.' -f1)
+              TABLE=$(echo "$hypertable" | cut -d'.' -f2)
+              
+              # Convert to hypertable with migrate_data
+              psql_c "$TARGET_DB" "SELECT create_hypertable('${SCHEMA}.${TABLE}', '${partition_column}', migrate_data => true, if_not_exists => true);" || {
+                echo "⚠ WARNING: Failed to convert ${hypertable} to hypertable"
+              }
+            fi
+          done < "$TS_INFO_PATH"
+        else
+          echo "⚠ No TimescaleDB metadata file found"
+          echo "  Searching for tables with time-series columns to convert..."
+          
+          # Auto-detect tables with time-series columns (time, timestamp, created_at, etc.)
+          # This is a fallback when no metadata file exists
+          gosu postgres psql -d "$TARGET_DB" -At -c \
+            "SELECT DISTINCT 
+               table_schema || '.' || table_name as full_table_name,
+               column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND (column_name IN ('time', 'timestamp', 'created_at', 'ts', 'date')
+                    OR data_type IN ('timestamp with time zone', 'timestamp without time zone'))
+               AND table_name NOT LIKE '%_hyper_%'
+             ORDER BY 1;" 2>/dev/null | while IFS='|' read -r full_table column_name; do
+            if [[ -n "$full_table" && -n "$column_name" ]]; then
+              echo "  Found candidate: $full_table (time column: $column_name)"
+              echo "    Converting to hypertable..."
+              
+              # Try to convert - may fail if table structure isn't suitable
+              set +e
+              psql_c "$TARGET_DB" "SELECT create_hypertable('${full_table}', '${column_name}', migrate_data => true, if_not_exists => true);" 2>&1 | grep -E "(ERROR|WARNING|SELECT)" | sed 's/^/      /'
+              CONVERT_EXIT=$?
+              set -e
+              
+              if [[ $CONVERT_EXIT -eq 0 ]]; then
+                echo "    ✓ Successfully converted $full_table"
+              else
+                echo "    ⚠ Could not convert $full_table (may not be suitable for time-series)"
+              fi
+            fi
+          done
+        fi
+      fi
+      
+      # Now verify the final state
       verify_timescaledb_restore
       
       # Display hypertable metadata if available
