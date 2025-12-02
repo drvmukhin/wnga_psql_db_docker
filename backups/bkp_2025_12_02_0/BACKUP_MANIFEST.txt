@@ -1,0 +1,16 @@
+PostgreSQL + TimescaleDB Complete Backup
+=========================================
+Created: Tue Dec  2 01:12:07 PST 2025
+Container: pg17-ts
+Backup Directory: /home/vasily/docker/pg17.5/backups/bkp_2025_12_02_0
+
+Databases Backed Up:
+
+Database: wnga_auth
+  - wnga_auth.bkp: 744K
+  - TimescaleDB: YES
+    ✓ Hypertables metadata: wnga_auth.hypertables.sql
+    ✓ Continuous aggregates: wnga_auth.continuous_aggs.sql
+    ✓ Compression settings: wnga_auth.compression.sql
+    ✓ Policies: wnga_auth.policies.sql
+  - Roles: wnga_auth.roles
